@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calculateur réparations — Hashtag & Arobase</title>
+<style>
+:root{--bg:#f7f7fb;--card:#fff;--text:#121212;--muted:#6b7280;--border:#e5e7eb;--soft:#f3f4f6}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#f9fafb 0%,#f3f4f6 100%);color:var(--text);max-width:980px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:28px;margin:0 0 6px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 18px;line-height:1.45}
+.wrap{display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.05)}
+label{display:block;margin:10px 0 6px;font-size:13px;font-weight:600;color:#374151}
+input,select{width:100%;padding:13px 14px;border:1px solid #d1d5db;border-radius:16px;font-size:16px;background:#fff;color:#111827}
+input[readonly]{background:var(--soft)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.resultBox{margin-top:14px;padding:16px;border-radius:18px;background:#111827;color:#fff}
+.resultLabel{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.result{font-size:38px;font-weight:800;margin-top:4px;letter-spacing:-.03em}
+.detail{margin-top:8px;color:rgba(255,255,255,.75);font-size:13px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.badge{display:inline-flex;align-items:center;font-size:12px;color:#374151;background:#fff;border:1px solid var(--border);border-radius:999px;padding:7px 10px}
+.hint{font-size:13px;color:var(--muted);line-height:1.45}
+.sectionTitle{font-size:15px;font-weight:700;margin:0 0 6px}
+@media (max-width:700px){.row{grid-template-columns:1fr}.result{font-size:32px}body{padding:16px 12px 28px}}
+</style>
+</head>
+<body>
+<h1>Calculateur prix de vente</h1>
+<p class="sub">Version v17 – interface plus propre pour la boutique, avec toutes les règles validées.</p>
+<div class="badges">
+  <span class="badge">Téléphone</span>
+  <span class="badge">Ordinateur</span>
+  <span class="badge">Offline</span>
+  <span class="badge">Prix TTC</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Catégorie</label>
+        <select id="category">
+          <option value="telephone">Téléphone</option>
+          <option value="pc">Ordinateur</option>
+        </select>
+      </div>
+      <div>
+        <label>Type de réparation</label>
+        <select id="repair"></select>
+      </div>
+    </div>
+
+    <label>Prix d'achat HT (€)</label>
+    <input id="paht" type="number" step="0.01" placeholder="Ex : 18" />
+
+    <div class="row">
+      <div>
+        <label>Coefficient</label>
+        <input id="coef" readonly />
+      </div>
+      <div>
+        <label>Forfait / Info</label>
+        <input id="forfait" readonly />
+      </div>
+    </div>
+
+    <div class="resultBox">
+      <div class="resultLabel">Prix final</div>
+      <div class="result" id="result">—</div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectionTitle">Rappels rapides</div>
+    <div class="hint">
+      Les prix affichés sont des prix TTC. Certaines réparations utilisent un prix fixe, d'autres une formule avec coefficient ou un ajout de main-d'œuvre.
+      Les bonus QualiRépar restent mentionnés lorsqu'ils sont inclus dans le prix final.
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  telephone: {
+    "Batterie smartphone": (pa) => (
+      pa <= 10 ? {fixed:50, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 75€)", detail:"Tranche ≤ 10,00 €"} :
+      pa <= 14.99 ? {fixed:55, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 80€)", detail:"Tranche 10,01 → 14,99 €"} :
+      pa <= 19.99 ? {fixed:60, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 85€)", detail:"Tranche 15,00 → 19,99 €"} :
+      pa <= 24.99 ? {fixed:65, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 90€)", detail:"Tranche 20,00 → 24,99 €"} :
+      pa <= 29.99 ? {fixed:70, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 95€)", detail:"Tranche 25,00 → 29,99 €"} :
+      pa <= 34.99 ? {fixed:75, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 100€)", detail:"Tranche 30,00 → 34,99 €"} :
+      pa <= 39.99 ? {fixed:80, coefText:"—", forfaitText:"Bonus QualiRepar -25€ inclus (catalogue 105€)", detail:"Tranche 35,00 → 39,99 €"} :
+      {fixed:"Non concerné", coefText:"—", forfaitText:"PA HT > 40€ non applicable", detail:"Hors grille"}
+    ),
+    "Écran": (pa) => (
+      pa <= 10 ? {fixed:70, coefText:"—", forfaitText:"Prix fixe", detail:"Tranche ≤ 10,00 €"} :
+      pa <= 60 ? {coef:1.2, forfait:60, detail:"Tranche ≤ 60,00 €"} :
+      pa <= 100 ? {coef:1.2, forfait:80, detail:"Tranche 60,01 → 100,00 €"} :
+      pa <= 150 ? {coef:1.2, forfait:90, detail:"Tranche 100,01 → 150,00 €"} :
+      {coef:1.2, forfait:120, detail:"Tranche ≥ 150,01 €"}
+    ),
+    "Lentille arrière": (pa) => (
+      pa <= 10 ? {fixed:35, coefText:"—", forfaitText:"Prix fixe", detail:"Tranche ≤ 10,00 €"} :
+      {fixed:49, coefText:"—", forfaitText:"Prix fixe", detail:"Tranche ≥ 10,01 €"}
+    ),
+    "Caméra arrière": (pa) => (
+      pa <= 10 ? {fixed:49, coefText:"—", forfaitText:"Prix fixe", detail:"Tranche ≤ 10,00 €"} :
+      pa <= 40 ? {coef:1.2, forfait:45, detail:"Tranche 10,01 → 40,00 €"} :
+      {coef:1.2, forfait:50, detail:"Tranche ≥ 40,01 €"}
+    ),
+    "Connecteur de charge": (pa) => (
+      pa <= 5 ? {coef:1.2, forfait:45, detail:"Tranche ≤ 5,00 €"} :
+      pa <= 15 ? {coef:1.2, forfait:45, detail:"Tranche 5,01 → 15,00 €"} :
+      pa <= 25 ? {coef:1.2, forfait:55, detail:"Tranche 15,01 → 25,00 €"} :
+      {coef:1.2, forfait:60, detail:"Tranche ≥ 25,01 €"}
+    )
+  },
+  pc: {
+    "Batterie (amovible)": (pa) => ({add:35, coefText:"1.00", forfaitText:"+ 35 €", detail:"PA HT + 35 € TTC"}),
+    "Batterie (intégrée)": (pa) => (
+      pa <= 35 ? {add:55, round:"floor5", coefText:"1.00", forfaitText:"+ 55 € (arrondi 0/5 inférieur)", detail:"Tranche ≤ 35,00 €"} :
+      pa <= 59.99 ? {fixed:100, coefText:"—", forfaitText:"Bonus QualiRepar -50€ inclus (catalogue 150€)", detail:"Tranche 35,01 → 59,99 €"} :
+      {add:60, round:"nearest5", coefText:"1.00", forfaitText:"+ 60 € • Bonus QualiRepar -50€ inclus", detail:"Tranche ≥ 60,00 €"}
+    ),
+    "Clavier simple": (pa) => ({add:60, coefText:"1.00", forfaitText:"+ 60 €", detail:"PA HT + 60 € TTC"}),
+    "Clavier + palmrest": (pa) => ({add:90, coefText:"1.00", forfaitText:"+ 90 €", detail:"PA HT + 90 € TTC"}),
+    "Écran PC Windows": (pa) => (
+      pa <= 50 ? {coef:1.2, forfait:100, detail:"Tranche ≤ 50,00 €"} :
+      pa <= 80 ? {coef:1.2, forfait:120, detail:"Tranche 50,01 → 80,00 €"} :
+      {coef:1.2, forfait:120, detail:"Tranche ≥ 80,01 €"}
+    ),
+    "Dalle MacBook": (pa) => ({macDalle:true, coefText:"1.20", forfaitText:"+ 120 € (arrondi au 0 supérieur)", detail:"(PA HT × 1,20) + 120 €, puis arrondi à la dizaine supérieure"}),
+    "Coverback + charnière": (pa) => ({add:120, coefText:"1.00", forfaitText:"+ 120 €", detail:"PA HT + 120 € TTC"})
+  }
+};
+
+const el=id=>document.getElementById(id);
+function roundNearest5(x){ return Math.round(x/5)*5; }
+function roundFloor5(x){ return Math.floor(x/5)*5; }
+function roundUp10(x){ return Math.ceil(x/10)*10; }
+
+function populateRepairs(){
+  const cat = el("category").value;
+  const r = el("repair");
+  const current = r.value;
+  r.innerHTML = "";
+  Object.keys(DATA[cat]).forEach(k=>{
+    const o = document.createElement("option");
+    o.value = k;
+    o.textContent = k;
+    r.appendChild(o);
+  });
+  r.value = (current && DATA[cat][current]) ? current : Object.keys(DATA[cat])[0];
+}
+
+function calc(){
+  const cat = el("category").value;
+  const rep = el("repair").value;
+  const pa = parseFloat(el("paht").value);
+
+  if(!rep || isNaN(pa) || pa < 0){
+    el("result").textContent = "—";
+    el("coef").value = "";
+    el("forfait").value = "";
+    el("detail").textContent = "";
+    return;
+  }
+
+  const rule = DATA[cat][rep](pa);
+
+  if(rule.fixed !== undefined){
+    el("coef").value = rule.coefText ?? "—";
+    el("forfait").value = rule.forfaitText ?? "Prix fixe";
+    el("result").textContent = (typeof rule.fixed === "string") ? rule.fixed : (rule.fixed + " € TTC");
+    el("detail").textContent = rule.detail ?? "";
+    return;
+  }
+
+  if(rule.macDalle){
+    const paTTC = pa * 1.20;
+    const brut = paTTC + 120;
+    const final = roundUp10(brut);
+    el("coef").value = rule.coefText ?? "1.20";
+    el("forfait").value = rule.forfaitText ?? "+ 120 €";
+    el("result").textContent = final.toFixed(0) + " € TTC";
+    el("detail").textContent = rule.detail ?? "";
+    return;
+  }
+
+  if(rule.add !== undefined){
+    const raw = pa + rule.add;
+    let price = raw;
+    if(rule.round === "nearest5") price = roundNearest5(raw);
+    if(rule.round === "floor5") price = roundFloor5(raw);
+
+    el("coef").value = rule.coefText ?? "1.00";
+    el("forfait").value = rule.forfaitText ?? ("+ " + rule.add + " €");
+    el("result").textContent = price.toFixed(0) + " € TTC";
+    el("detail").textContent = rule.detail ?? "";
+    return;
+  }
+
+  if(rule.coef){
+    const raw = (pa * rule.coef) + rule.forfait;
+    const price = roundNearest5(raw);
+    el("coef").value = rule.coef.toFixed(2);
+    el("forfait").value = rule.forfait + " €";
+    el("result").textContent = price.toFixed(0) + " € TTC";
+    el("detail").textContent = rule.detail ?? "";
+    return;
+  }
+}
+
+el("category").addEventListener("change", ()=>{ populateRepairs(); calc(); });
+el("repair").addEventListener("change", calc);
+el("paht").addEventListener("input", calc);
+
+populateRepairs();
+calc();
+</script>
+</body>
+</html>
